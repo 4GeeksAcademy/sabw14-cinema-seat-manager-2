@@ -1,3 +1,5 @@
+import "./style.css";
+
 let filas = 8;
 let columnas = 10;
 
@@ -114,106 +116,141 @@ const sala = inicializarMatrizAsientos(filas, columnas);
 
 // Solo edita este bloque para simular personas que llegan.
 // Si lo dejas vacio ([]), la sala se mantiene completamente libre (todo en L).
-const lotesDePersonas: CoordenadaAsiento[] = [
-	[1, 1],
-	[1, 2],
-	[1, 3],
-	[1, 4],
-	[1, 5],
-	[1, 6],
-	[1, 7],
-	[1, 8],
-	[1, 9],
-	[1, 10],
-	[2, 1],
-	[2, 2],
-	[2, 3],
-	[2, 4],
-	[2, 5],
-	[2, 6],
-	[2, 7],
-	[2, 8],
-	[2, 9],
-	[2, 10],
-	[3, 1],
-	[3, 2],
-	[3, 3],
-	[3, 4],
-	[3, 5],
-	[3, 6],
-	[3, 7],
-	[3, 8],
-	[3, 9],
-	[3, 10],
-	[4, 1],
-	[4, 2],
-	[4, 3],
-	[4, 4],
-	[4, 5],
-	[4, 6],
-	[4, 7],
-	[4, 8],
-	[4, 9],
-	[4, 10],
-	[5, 1],
-	[5, 2],
-	[5, 3],
-	[5, 4],
-	[5, 5],
-	[5, 6],
-	[5, 7],
-	[5, 8],
-	[5, 9],
-	[5, 10],
-	[6, 1],
-	[6, 2],
-	[6, 3],
-	[6, 4],
-	[6, 5],
-	[6, 6],
-	[6, 7],
-	[6, 8],
-	[6, 9],
-	[6, 10],
-	[7, 1],
-	[7, 2],
-	[7, 3],
-	[7, 4],
-	[7, 5],
-	[7, 6],
-	[7, 7],
-	[7, 8],
-	[7, 9],
-	[7, 10],
-	[8, 1],
-	[8, 2],
-	[8, 3],
-	[8, 4],
-	[8, 5],
-	[8, 6],
-	[8, 7],
-	[8, 8],
-	[8, 9],
-	[8, 10],
-];
+const lotesDePersonas: CoordenadaAsiento[] = [];
 
-console.log("Estado inicial de la sala:");
-mostrarEstadoSala(sala);
+const enNavegador = typeof document !== "undefined";
+const seatGrid = enNavegador ? document.querySelector<HTMLDivElement>("#seat-grid") : null;
+const ocupadosEl = enNavegador ? document.querySelector<HTMLParagraphElement>("#ocupados") : null;
+const disponiblesEl = enNavegador ? document.querySelector<HTMLParagraphElement>("#disponibles") : null;
+const sugerenciaEl = enNavegador ? document.querySelector<HTMLParagraphElement>("#sugerencia") : null;
+const mensajeEl = enNavegador ? document.querySelector<HTMLParagraphElement>("#mensaje") : null;
 
-procesarLotesDePersonas(sala, lotesDePersonas);
+function actualizarPanel(matriz: number[][]): void {
+	if (!ocupadosEl || !disponiblesEl || !sugerenciaEl) {
+		return;
+	}
 
-console.log("\nEstado final de la sala:");
-mostrarEstadoSala(sala);
+	const resumen = contarAsientos(matriz);
+	ocupadosEl.textContent = String(resumen.ocupados);
+	disponiblesEl.textContent = String(resumen.disponibles);
 
-const resumen = contarAsientos(sala);
-console.log("\nResumen:", resumen);
+	const par = buscarDosAsientosLibresContiguos(matriz);
+	if (par) {
+		sugerenciaEl.textContent = `Par recomendado: fila ${par.fila}, columnas ${par.columnaInicio} y ${par.columnaFin}.`;
+	} else {
+		sugerenciaEl.textContent = "No hay asientos contiguos disponibles.";
+	}
+}
 
-const asientosContiguos = buscarDosAsientosLibresContiguos(sala);
-if (asientosContiguos) {
-	console.log(
-		`Primer par contiguo libre: fila ${asientosContiguos.fila}, columnas ${asientosContiguos.columnaInicio} y ${asientosContiguos.columnaFin}`,
-	);
+function actualizarMensaje(texto: string): void {
+	if (!mensajeEl) {
+		return;
+	}
+
+	mensajeEl.textContent = texto;
+}
+
+function crearEncabezados(contenedor: HTMLDivElement): void {
+	contenedor.style.gridTemplateColumns = `repeat(${columnas + 1}, minmax(0, 1fr))`;
+
+	const esquina = document.createElement("div");
+	esquina.className = "text-center text-[10px] font-semibold uppercase tracking-widest text-slate-300/60";
+	esquina.textContent = "F/C";
+	contenedor.appendChild(esquina);
+
+	for (let columna = 1; columna <= columnas; columna++) {
+		const celdaColumna = document.createElement("div");
+		celdaColumna.className = "text-center text-xs font-bold text-slate-200";
+		celdaColumna.textContent = String(columna);
+		contenedor.appendChild(celdaColumna);
+	}
+}
+
+function crearBotonAsiento(numeroFila: number, numeroColumna: number, ocupado: boolean): HTMLButtonElement {
+	const boton = document.createElement("button");
+	boton.type = "button";
+	boton.textContent = ocupado ? "X" : "L";
+	boton.dataset.fila = String(numeroFila);
+	boton.dataset.columna = String(numeroColumna);
+	boton.className = [
+		"h-9 rounded-lg border text-sm font-extrabold transition",
+		ocupado
+			? "cursor-not-allowed border-amber-200/40 bg-amber-300 text-amber-950"
+			: "border-emerald-200/40 bg-emerald-300/90 text-emerald-950 hover:-translate-y-0.5 hover:bg-emerald-200",
+	].join(" ");
+	boton.disabled = ocupado;
+
+	return boton;
+}
+
+function renderizarSala(matriz: number[][]): void {
+	if (!seatGrid) {
+		return;
+	}
+
+	seatGrid.innerHTML = "";
+	crearEncabezados(seatGrid);
+
+	for (let fila = 1; fila <= filas; fila++) {
+		const etiquetaFila = document.createElement("div");
+		etiquetaFila.className = "self-center text-center text-xs font-bold text-slate-200";
+		etiquetaFila.textContent = `F${String(fila).padStart(2, "0")}`;
+		seatGrid.appendChild(etiquetaFila);
+
+		for (let columna = 1; columna <= columnas; columna++) {
+			const ocupado = matriz[fila - 1][columna - 1] === 1;
+			const boton = crearBotonAsiento(fila, columna, ocupado);
+			boton.addEventListener("click", () => {
+				const exito = reservarAsiento(matriz, fila, columna);
+				if (exito) {
+					actualizarMensaje(`Reserva confirmada: fila ${fila}, columna ${columna}.`);
+				} else {
+					actualizarMensaje(`No se pudo reservar fila ${fila}, columna ${columna}.`);
+				}
+				actualizarPanel(matriz);
+				renderizarSala(matriz);
+			});
+			seatGrid.appendChild(boton);
+		}
+	}
+}
+
+function iniciarAplicacion(): void {
+	if (!enNavegador) {
+		return;
+	}
+
+	if (!seatGrid || !ocupadosEl || !disponiblesEl || !sugerenciaEl || !mensajeEl) {
+		return;
+	}
+
+	procesarLotesDePersonas(sala, lotesDePersonas);
+	actualizarPanel(sala);
+	renderizarSala(sala);
+	actualizarMensaje("Selecciona un asiento libre para reservar.");
+}
+
+if (enNavegador) {
+	iniciarAplicacion();
 } else {
-	console.log("No hay asientos contiguos disponibles.");
+	console.log("Estado inicial de la sala:");
+	mostrarEstadoSala(sala);
+
+	procesarLotesDePersonas(sala, lotesDePersonas);
+
+	console.log("\nEstado final de la sala:");
+	mostrarEstadoSala(sala);
+
+	const resumen = contarAsientos(sala);
+	console.log("\nResumen:", resumen);
+
+	const asientosContiguos = buscarDosAsientosLibresContiguos(sala);
+	if (asientosContiguos) {
+		console.log(
+			`Primer par contiguo libre: fila ${asientosContiguos.fila}, columnas ${asientosContiguos.columnaInicio} y ${asientosContiguos.columnaFin}`,
+		);
+	} else {
+		console.log("No hay asientos contiguos disponibles.");
+	}
 }
 
